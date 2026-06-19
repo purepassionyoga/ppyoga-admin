@@ -117,6 +117,7 @@
     <div class="tabs">
       <button class="tab on" data-tab="dash">Dashboard</button>
       <button class="tab" data-tab="poses">Poses</button>
+      <button class="tab" data-tab="design">Design</button>
     </div>
   </div>
 
@@ -131,6 +132,7 @@
       </div>
       <div id="plist" class="plist"></div>
     </div>
+    <div id="design" class="hidden"></div>
   </div>
 </div>
 
@@ -165,7 +167,7 @@ function showLogin(){ $("login").classList.remove("hidden"); $("app").classList.
 async function showApp(session){
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   $("whoami").textContent = session.user.email;
-  await loadPoses();
+  await loadPoses(); loadDesign();
 }
 $("signin").onclick=async()=>{
   $("loginErr").classList.add("hidden");
@@ -185,6 +187,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
   $("dash").classList.toggle("hidden", t.dataset.tab!=="dash");
   $("poses").classList.toggle("hidden", t.dataset.tab!=="poses");
+  $("design").classList.toggle("hidden", t.dataset.tab!=="design");
 });
 
 /* ---------- DATA ---------- */
@@ -222,6 +225,41 @@ function renderPoses(){
 }
 $("search").addEventListener("input",renderPoses);
 $("newPose").onclick=()=>openEditor(null);
+
+/* ---------- DESIGN ---------- */
+let DESIGN={};
+const D_TEXT=[["app_name","App name"],["tagline","Tagline"],["website_url","Website URL"]];
+const D_COLORS=[["color_primary","Primary (Dusty Rose) \u2014 headings, names, buttons"],["color_secondary","Secondary (Sage) \u2014 Sanskrit, accents"],["color_page_bg","Page background"],["color_surface","Card / surface"],["color_body_text","Body text"],["color_secondary_text","Secondary text"]];
+const D_FONTS=["Playfair Display","Poppins","Lora","Cormorant Garamond","EB Garamond","Merriweather","Montserrat","Lato","Raleway","Nunito","Work Sans","Quicksand"];
+async function loadDesign(){const{data}=await sb.from("app_settings").select("value").eq("key","design").single();DESIGN=(data&&data.value)||{};renderDesign();}
+function renderDesign(){
+  const d=DESIGN;
+  const txt=D_TEXT.map(([k,l])=>`<div class="field"><label>${l}</label><input id="d_${k}" value="${esc(d[k]||"")}"/></div>`).join("");
+  const cols=D_COLORS.map(([k,l])=>`<div class="field"><label>${l}</label><div style="display:flex;gap:8px;align-items:center">
+     <input type="color" id="d_${k}" value="${esc(d[k]||"#cccccc")}" style="width:46px;height:34px;padding:2px;border:1px solid var(--lineDk);border-radius:8px"/>
+     <input type="text" id="dt_${k}" value="${esc(d[k]||"")}" style="flex:1"/></div></div>`).join("");
+  const fonts=`<datalist id="fontlist">${D_FONTS.map(f=>`<option value="${f}">`).join("")}</datalist>
+   <div class="row2"><div class="field"><label>Heading font</label><input id="d_font_heading" list="fontlist" value="${esc(d.font_heading||"Playfair Display")}"/></div>
+   <div class="field"><label>Body font</label><input id="d_font_body" list="fontlist" value="${esc(d.font_body||"Poppins")}"/></div></div>`;
+  $("design").innerHTML=`<div id="designErr" class="err hidden"></div>
+    <div class="grp"><div class="gt">Branding</div>${txt}</div>
+    <div class="grp"><div class="gt">Colors</div>${cols}</div>
+    <div class="grp"><div class="gt">Typography</div>${fonts}</div>
+    <button class="btn" id="d_save">Save design</button>
+    <span id="d_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("d_save").onclick=saveDesign;
+  D_COLORS.forEach(([k])=>{const c=$("d_"+k),t=$("dt_"+k);c.oninput=()=>{t.value=c.value;};t.oninput=()=>{if(/^#?[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value.startsWith("#")?t.value:"#"+t.value;};});
+}
+async function saveDesign(){
+  const d={};D_TEXT.forEach(([k])=>d[k]=$("d_"+k).value.trim());
+  D_COLORS.forEach(([k])=>{const t=$("dt_"+k).value.trim();d[k]=t?(t.startsWith("#")?t:"#"+t):$("d_"+k).value;});
+  d.font_heading=$("d_font_heading").value.trim()||"Playfair Display";d.font_body=$("d_font_body").value.trim()||"Poppins";
+  $("d_save").disabled=true;$("d_save").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"design",value:d});
+  $("d_save").disabled=false;$("d_save").textContent="Save design";
+  if(error){const e=$("designErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  DESIGN=d;$("d_status").textContent="Saved \u2713 \u2014 refresh the public library to see it.";
+}
 
 /* ---------- EDITOR ---------- */
 function dl(field){return `<datalist id="dl_${field}">${(SUG[field]||[]).map(v=>`<option value="${esc(v)}">`).join("")}</datalist>`;}
