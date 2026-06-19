@@ -119,6 +119,7 @@
       <button class="tab" data-tab="poses">Poses</button>
       <button class="tab" data-tab="design">Design</button>
       <button class="tab" data-tab="library">Library</button>
+      <button class="tab" data-tab="builder">Builder</button>
     </div>
   </div>
 
@@ -135,6 +136,7 @@
     </div>
     <div id="design" class="hidden"></div>
     <div id="library" class="hidden"></div>
+    <div id="builder" class="hidden"></div>
   </div>
 </div>
 
@@ -169,7 +171,7 @@ function showLogin(){ $("login").classList.remove("hidden"); $("app").classList.
 async function showApp(session){
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   $("whoami").textContent = session.user.email;
-  await loadPoses(); loadDesign(); loadLibrary();
+  await loadPoses(); loadDesign(); loadLibrary(); loadBuilderSettings();
 }
 $("signin").onclick=async()=>{
   $("loginErr").classList.add("hidden");
@@ -191,6 +193,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("poses").classList.toggle("hidden", t.dataset.tab!=="poses");
   $("design").classList.toggle("hidden", t.dataset.tab!=="design");
   $("library").classList.toggle("hidden", t.dataset.tab!=="library");
+  $("builder").classList.toggle("hidden", t.dataset.tab!=="builder");
 });
 
 /* ---------- DATA ---------- */
@@ -301,6 +304,43 @@ async function saveLibrary(){
   $("l_save").disabled=false;$("l_save").textContent="Save library settings";
   if(error){const e=$("libErr");e.textContent=error.message;e.classList.remove("hidden");return;}
   LIB=d;$("l_status").textContent="Saved \u2713 \u2014 refresh the public library to see it.";
+}
+
+/* ---------- BUILDER SETTINGS ---------- */
+let BSET={};
+async function loadBuilderSettings(){const{data}=await sb.from("app_settings").select("value").eq("key","builder").single();BSET=(data&&data.value)||{};renderBuilderSettings();}
+function renderBuilderSettings(){
+  const d=BSET,lvl=d.default_level||"Beginner",dur=d.default_duration||"30 min",br=d.flow_breath||5;
+  const durs=["5 min","10 min","15 min","20 min","25 min","30 min","45 min","60 min","75 min","90 min"];
+  $("builder").innerHTML=`<div id="bldErr" class="err hidden"></div>
+   <div class="grp"><div class="gt">Sequence Builder defaults</div>
+     <div class="field"><label>Default sequence title</label><input id="b_default_title" value="${esc(d.default_title||"My Yoga Sequence")}"/></div>
+     <div class="row2">
+       <div class="field"><label>Default level</label><select id="b_default_level">${["Beginner","Intermediate","Advanced"].map(x=>`<option ${x===lvl?"selected":""}>${x}</option>`).join("")}</select></div>
+       <div class="field"><label>Default duration</label><select id="b_default_duration">${durs.map(x=>`<option ${x===dur?"selected":""}>${x}</option>`).join("")}</select></div>
+     </div>
+   </div>
+   <div class="grp"><div class="gt">Print &amp; export</div>
+     <div class="field"><label>Print footer text</label><input id="b_print_footer" value="${esc(d.print_footer||"Created with PurePassionYoga.com")}"/></div>
+   </div>
+   <div class="grp"><div class="gt">Flow mode</div>
+     <div class="field"><label>Default breath length (seconds)</label><select id="b_flow_breath">${[3,4,5,6,7,8,10].map(x=>`<option ${x==br?"selected":""}>${x}</option>`).join("")}</select></div>
+     <label class="toggle"><input type="checkbox" id="b_flow_chime" ${d.flow_chime?"checked":""}/> Chime between poses by default</label>
+     <label class="toggle" style="margin-top:8px"><input type="checkbox" id="b_flow_voice" ${d.flow_voice?"checked":""}/> Read pose names aloud by default</label>
+   </div>
+   <button class="btn" id="b_save_set">Save builder settings</button>
+   <span id="b_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("b_save_set").onclick=saveBuilderSettings;
+}
+async function saveBuilderSettings(){
+  const d={default_title:$("b_default_title").value.trim(),default_level:$("b_default_level").value,default_duration:$("b_default_duration").value,
+    print_footer:$("b_print_footer").value.trim(),flow_breath:parseInt($("b_flow_breath").value)||5,
+    flow_chime:$("b_flow_chime").checked,flow_voice:$("b_flow_voice").checked};
+  $("b_save_set").disabled=true;$("b_save_set").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"builder",value:d});
+  $("b_save_set").disabled=false;$("b_save_set").textContent="Save builder settings";
+  if(error){const e=$("bldErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  BSET=d;$("b_status").textContent="Saved \u2713 \u2014 the Sequence Builder picks these up on next load.";
 }
 
 /* ---------- EDITOR ---------- */
