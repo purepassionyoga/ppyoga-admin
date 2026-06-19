@@ -118,6 +118,7 @@
       <button class="tab on" data-tab="dash">Dashboard</button>
       <button class="tab" data-tab="poses">Poses</button>
       <button class="tab" data-tab="design">Design</button>
+      <button class="tab" data-tab="library">Library</button>
     </div>
   </div>
 
@@ -133,6 +134,7 @@
       <div id="plist" class="plist"></div>
     </div>
     <div id="design" class="hidden"></div>
+    <div id="library" class="hidden"></div>
   </div>
 </div>
 
@@ -167,7 +169,7 @@ function showLogin(){ $("login").classList.remove("hidden"); $("app").classList.
 async function showApp(session){
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   $("whoami").textContent = session.user.email;
-  await loadPoses(); loadDesign();
+  await loadPoses(); loadDesign(); loadLibrary();
 }
 $("signin").onclick=async()=>{
   $("loginErr").classList.add("hidden");
@@ -188,6 +190,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("dash").classList.toggle("hidden", t.dataset.tab!=="dash");
   $("poses").classList.toggle("hidden", t.dataset.tab!=="poses");
   $("design").classList.toggle("hidden", t.dataset.tab!=="design");
+  $("library").classList.toggle("hidden", t.dataset.tab!=="library");
 });
 
 /* ---------- DATA ---------- */
@@ -259,6 +262,45 @@ async function saveDesign(){
   $("d_save").disabled=false;$("d_save").textContent="Save design";
   if(error){const e=$("designErr");e.textContent=error.message;e.classList.remove("hidden");return;}
   DESIGN=d;$("d_status").textContent="Saved \u2713 \u2014 refresh the public library to see it.";
+}
+
+/* ---------- LIBRARY SETTINGS ---------- */
+let LIB={};
+async function loadLibrary(){const{data}=await sb.from("app_settings").select("value").eq("key","library").single();LIB=(data&&data.value)||{};renderLibrary();}
+function renderLibrary(){
+  const d=LIB,total=POSES.length,free=POSES.filter(p=>p.is_free).length,prem=total-free,view=d.default_view||"grid";
+  $("library").innerHTML=`<div id="libErr" class="err hidden"></div>
+   <div class="grp"><div class="gt">Pose Library display</div>
+     <div class="field"><label>Detail button text</label><input id="l_detail_button_text" value="${esc(d.detail_button_text||"Learn More About This Pose")}"/></div>
+     <div class="row2">
+       <div class="field"><label>Default view</label><select id="l_default_view"><option value="grid"${view==="grid"?" selected":""}>grid</option><option value="list"${view==="list"?" selected":""}>list</option></select></div>
+       <div class="field"><label>Poses per page (0 = all)</label><input id="l_poses_per_page" type="number" min="0" value="${esc(d.poses_per_page!=null?d.poses_per_page:0)}"/></div>
+     </div>
+     <div class="field"><label>Free-tier pose limit</label><input id="l_free_pose_limit" type="number" min="0" value="${esc(d.free_pose_limit!=null?d.free_pose_limit:8)}"/><div class="hint">Applies once member tiers exist on the public site.</div></div>
+   </div>
+   <div class="grp"><div class="gt">Pose of the Day</div>
+     <label class="toggle"><input type="checkbox" id="l_potd_enabled" ${d.potd_enabled!==false?"checked":""}/> Show the Pose of the Day banner</label>
+     <div class="field" style="margin-top:10px"><label>Pinned pose (blank = auto-rotate daily)</label><input id="l_potd_slug" list="slugs" value="${esc(d.potd_slug||"")}"/>
+       <datalist id="slugs">${POSES.map(x=>`<option value="${esc(x.slug)}">${esc(x.name)}</option>`).join("")}</datalist></div>
+   </div>
+   <div class="grp"><div class="gt">Library stats</div>
+     <div class="stats"><div class="stat"><div class="n">${total}</div><div class="l">Total poses</div></div>
+       <div class="stat"><div class="n">${free}</div><div class="l">Free poses</div></div>
+       <div class="stat"><div class="n">${prem}</div><div class="l">Premium poses</div></div></div>
+   </div>
+   <button class="btn" id="l_save">Save library settings</button>
+   <span id="l_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("l_save").onclick=saveLibrary;
+}
+async function saveLibrary(){
+  const d={detail_button_text:$("l_detail_button_text").value.trim(),default_view:$("l_default_view").value,
+    poses_per_page:parseInt($("l_poses_per_page").value)||0,free_pose_limit:parseInt($("l_free_pose_limit").value)||0,
+    potd_enabled:$("l_potd_enabled").checked,potd_slug:$("l_potd_slug").value.trim()};
+  $("l_save").disabled=true;$("l_save").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"library",value:d});
+  $("l_save").disabled=false;$("l_save").textContent="Save library settings";
+  if(error){const e=$("libErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  LIB=d;$("l_status").textContent="Saved \u2713 \u2014 refresh the public library to see it.";
 }
 
 /* ---------- EDITOR ---------- */
