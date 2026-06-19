@@ -120,6 +120,7 @@
       <button class="tab" data-tab="design">Design</button>
       <button class="tab" data-tab="library">Library</button>
       <button class="tab" data-tab="builder">Builder</button>
+      <button class="tab" data-tab="email">Email</button>
     </div>
   </div>
 
@@ -137,6 +138,7 @@
     <div id="design" class="hidden"></div>
     <div id="library" class="hidden"></div>
     <div id="builder" class="hidden"></div>
+    <div id="email" class="hidden"></div>
   </div>
 </div>
 
@@ -171,7 +173,7 @@ function showLogin(){ $("login").classList.remove("hidden"); $("app").classList.
 async function showApp(session){
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   $("whoami").textContent = session.user.email;
-  await loadPoses(); loadDesign(); loadLibrary(); loadBuilderSettings();
+  await loadPoses(); loadDesign(); loadLibrary(); loadBuilderSettings(); loadEmail();
 }
 $("signin").onclick=async()=>{
   $("loginErr").classList.add("hidden");
@@ -194,6 +196,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("design").classList.toggle("hidden", t.dataset.tab!=="design");
   $("library").classList.toggle("hidden", t.dataset.tab!=="library");
   $("builder").classList.toggle("hidden", t.dataset.tab!=="builder");
+  $("email").classList.toggle("hidden", t.dataset.tab!=="email");
 });
 
 /* ---------- DATA ---------- */
@@ -341,6 +344,49 @@ async function saveBuilderSettings(){
   $("b_save_set").disabled=false;$("b_save_set").textContent="Save builder settings";
   if(error){const e=$("bldErr");e.textContent=error.message;e.classList.remove("hidden");return;}
   BSET=d;$("b_status").textContent="Saved \u2713 \u2014 the Sequence Builder picks these up on next load.";
+}
+
+/* ---------- EMAIL SETTINGS ---------- */
+let EMAIL={};
+async function loadEmail(){const{data}=await sb.from("app_settings").select("value").eq("key","email").single();EMAIL=(data&&data.value)||{};renderEmail();}
+function emailPrevHTML(){
+  const subj=($("e_subject")?$("e_subject").value:EMAIL.subject)||"Your Sequence of the Week from Pure Passion Yoga";
+  const intro=($("e_intro")?$("e_intro").value:EMAIL.intro)||"Here is this week\u2019s featured yoga sequence to inspire your practice.";
+  const sign=($("e_signoff")?$("e_signoff").value:EMAIL.signoff)||"Practice with love from PurePassionYoga.com";
+  return `<div style="border:1px solid var(--line);border-radius:12px;padding:20px;background:#fff;max-width:440px">
+    <div style="font-size:11px;letter-spacing:.16em;color:var(--muted)">PURE PASSION YOGA</div>
+    <div style="font-family:'Playfair Display',serif;color:var(--clayDk);font-size:22px;margin:6px 0 10px;line-height:1.2">${esc(subj)}</div>
+    <div style="color:var(--ink);font-size:14px">${esc(intro)}</div>
+    <ul style="color:var(--ink);font-size:14px;margin:12px 0;padding-left:18px"><li>Mountain \u2014 5 breaths</li><li>Warrior I \u2014 5 breaths</li><li>Downward Dog \u2014 8 breaths</li></ul>
+    <div style="display:inline-block;background:var(--clayDk);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px">View Sequence \u2192</div>
+    <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:10px;color:var(--muted);font-size:12px">${esc(sign)}</div>
+  </div>`;
+}
+function renderEmail(){
+  const d=EMAIL;
+  $("email").innerHTML=`<div id="emErr" class="err hidden"></div>
+   <div class="grp"><div class="gt">Sequence of the Week email</div>
+     <label class="toggle"><input type="checkbox" id="e_enabled" ${d.enabled?"checked":""}/> Enable the weekly email</label>
+     <div class="field" style="margin-top:10px"><label>Subject line</label><input id="e_subject" value="${esc(d.subject||"Your Sequence of the Week from Pure Passion Yoga")}"/></div>
+     <div class="field"><label>Intro paragraph</label><textarea id="e_intro">${esc(d.intro||"Here is this week\u2019s featured yoga sequence to inspire your practice.")}</textarea></div>
+     <div class="field"><label>Sign-off</label><textarea id="e_signoff">${esc(d.signoff||"Practice with love from PurePassionYoga.com")}</textarea></div>
+     <div class="row2"><div class="field"><label>From name</label><input id="e_from_name" value="${esc(d.from_name||"")}" placeholder="Pure Passion Yoga"/></div>
+       <div class="field"><label>From email</label><input id="e_from_email" value="${esc(d.from_email||"")}" placeholder="hello@purepassionyoga.com"/></div></div>
+   </div>
+   <div class="grp"><div class="gt">Preview</div><div id="emailPrev">${emailPrevHTML()}</div></div>
+   <button class="btn" id="e_save">Save email settings</button>
+   <span id="e_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("e_save").onclick=saveEmail;
+  ["e_subject","e_intro","e_signoff"].forEach(k=>$(k).addEventListener("input",()=>{$("emailPrev").innerHTML=emailPrevHTML();}));
+}
+async function saveEmail(){
+  const d={enabled:$("e_enabled").checked,subject:$("e_subject").value.trim(),intro:$("e_intro").value.trim(),
+    signoff:$("e_signoff").value.trim(),from_name:$("e_from_name").value.trim(),from_email:$("e_from_email").value.trim()};
+  $("e_save").disabled=true;$("e_save").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"email",value:d});
+  $("e_save").disabled=false;$("e_save").textContent="Save email settings";
+  if(error){const e=$("emErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  EMAIL=d;$("e_status").textContent="Saved \u2713";
 }
 
 /* ---------- EDITOR ---------- */
