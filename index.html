@@ -90,6 +90,32 @@
   .imgprev{width:84px;height:84px;border-radius:12px;background:#F4EEF3;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto}
   .imgprev img{max-width:100%;max-height:100%;object-fit:contain}
   @media (max-width:640px){.row2{grid-template-columns:1fr}}
+
+  /* engagement */
+  .erow-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;flex-wrap:wrap}
+  .note{color:var(--muted);font-size:12px}
+  .tierbars{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 18px;margin-top:14px}
+  .tbar{display:flex;align-items:center;gap:12px;margin:9px 0}
+  .tbar .nm{width:108px;font-size:13px;color:var(--ink);text-transform:capitalize}
+  .tbar .track{flex:1;background:#F2ECF2;border-radius:999px;height:10px;overflow:hidden}
+  .tbar .fill{height:100%;border-radius:999px;min-width:3px}
+  .tbar .ct{width:34px;text-align:right;font-size:13px;color:var(--muted)}
+  .ecols{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;margin-top:8px;align-items:start}
+  @media (max-width:860px){.ecols{grid-template-columns:1fr}}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:16px}
+  .panel .ph{padding:13px 16px;border-bottom:1px solid var(--line);font-family:'Playfair Display',serif;color:var(--head);font-size:16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .panel .ph .cnt{font-family:'Poppins',sans-serif;font-size:12px;color:var(--muted)}
+  .erow{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  .erow:last-child{border-bottom:none}
+  .erow .av{width:34px;height:34px;border-radius:9px;background:#F4EEF3;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto;color:var(--clayDk);font-weight:600}
+  .erow .mn{font-weight:500;color:var(--head)}
+  .erow .ms{color:var(--muted);font-size:12px}
+  .erow .right{margin-left:auto;text-align:right;font-size:12px;color:var(--muted)}
+  .tierpill{font-size:11px;padding:2px 9px;border-radius:999px;text-transform:capitalize;font-weight:500}
+  .empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13px}
+  .empty .em-ic{font-size:22px;display:block;margin-bottom:6px;opacity:.65}
+  .esearch{padding:10px 14px;border-bottom:1px solid var(--line)}
+  .esearch input{width:100%;padding:8px 11px;border:1px solid var(--lineDk);border-radius:9px;background:var(--field);outline:none}
 </style>
 </head>
 <body>
@@ -116,6 +142,7 @@
     </div>
     <div class="tabs">
       <button class="tab on" data-tab="dash">Dashboard</button>
+      <button class="tab" data-tab="engage">Engagement</button>
       <button class="tab" data-tab="poses">Poses</button>
       <button class="tab" data-tab="design">Design</button>
       <button class="tab" data-tab="library">Library</button>
@@ -128,6 +155,7 @@
     <div id="dash">
       <div id="stats" class="stats"></div>
     </div>
+    <div id="engage" class="hidden"></div>
     <div id="poses" class="hidden">
       <div class="toolbar">
         <input id="search" placeholder="Search poses by name or Sanskrit…" />
@@ -192,12 +220,130 @@ $("signout").onclick=async()=>{ await sb.auth.signOut(); POSES=[]; showLogin(); 
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
   $("dash").classList.toggle("hidden", t.dataset.tab!=="dash");
+  $("engage").classList.toggle("hidden", t.dataset.tab!=="engage");
   $("poses").classList.toggle("hidden", t.dataset.tab!=="poses");
   $("design").classList.toggle("hidden", t.dataset.tab!=="design");
   $("library").classList.toggle("hidden", t.dataset.tab!=="library");
   $("builder").classList.toggle("hidden", t.dataset.tab!=="builder");
   $("email").classList.toggle("hidden", t.dataset.tab!=="email");
+  if(t.dataset.tab==="engage") loadEngagement();
 });
+
+/* ---------- ENGAGEMENT ---------- */
+let ENG=null, engLoaded=false;
+const TIER_C={free:"#8A8090",practitioner:"#A87C83",teacher:"#2E7D6B",ultimate:"#B98A1F",premium:"#7A6B8A",member:"#9A8FA8"};
+const tierPill=t=>{const c=TIER_C[t]||"#8A8090";return `<span class="tierpill" style="background:${c}22;color:${c}">${esc(t||"free")}</span>`;};
+const emptyState=(ic,msg)=>`<div class="empty"><span class="em-ic">${ic}</span>${esc(msg)}</div>`;
+const dt=s=>s?new Date(s).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"";
+
+async function loadEngagement(force){
+  if(engLoaded && !force) return;
+  $("engage").innerHTML=`<div class="empty">Loading engagement…</div>`;
+  const { data, error } = await sb.rpc("admin_engagement");
+  if(error){ $("engage").innerHTML=emptyState("🔒","Couldn’t load engagement: "+error.message); return; }
+  ENG=data||{}; engLoaded=true; renderEngagement();
+}
+
+function memberRows(list){
+  if(!list.length) return `<div class="empty">No members match.</div>`;
+  return list.map(m=>{
+    const nm=m.display_name||m.email||"Member";
+    const initial=(nm.trim()[0]||"?").toUpperCase();
+    return `<div class="erow">
+      <div class="av">${esc(initial)}</div>
+      <div><div class="mn">${esc(nm)}${m.is_admin?' <span class="note">· admin</span>':''}</div><div class="ms">${esc(m.email||"")}</div></div>
+      <div class="right">${tierPill(m.tier)}<div style="margin-top:3px">🔥 ${m.streak_current} · ${m.practices} ${m.practices===1?"practice":"practices"}</div><div class="note">joined ${esc(dt(m.created_at))}</div></div>
+    </div>`;
+  }).join("");
+}
+
+function renderEngagement(){
+  const o=ENG.overview||{};
+  const cards=[
+    ["Members", o.members_total],
+    ["Paid members", o.members_paid],
+    ["Active · 7 days", o.active_7d],
+    ["Practices logged", o.practices_total],
+    ["Community sequences", o.community_sequences],
+    ["Newsletter list", o.newsletter_total],
+    ["Awaiting claim", o.staged_unclaimed],
+  ];
+  const statCards=cards.map(c=>`<div class="stat"><div class="n">${c[1]??0}</div><div class="l">${c[0]}</div></div>`).join("");
+
+  const tiers=ENG.tiers||[];
+  const maxc=Math.max(1,...tiers.map(t=>t.count));
+  const bars=tiers.length
+    ? tiers.map(t=>{const c=TIER_C[t.tier]||"#8A8090";const w=Math.round(t.count/maxc*100);
+        return `<div class="tbar"><div class="nm">${esc(t.tier)}</div><div class="track"><div class="fill" style="width:${w}%;background:${c}"></div></div><div class="ct">${t.count}</div></div>`;}).join("")
+    : emptyState("👤","No members yet.");
+
+  const leaders=(ENG.streak_leaders||[]);
+  const leadersHtml=leaders.length
+    ? leaders.map(s=>`<div class="erow"><div class="av">🔥</div><div><div class="mn">${esc(s.display_name)}</div><div class="ms">longest ${s.streak_longest} days</div></div><div class="right" style="font-family:'Playfair Display',serif;font-size:22px;color:var(--head)">${s.streak_current}</div></div>`).join("")
+    : emptyState("🔥","No active streaks yet. This fills in as members practice on consecutive days.");
+
+  const rp=(ENG.recent_practice||[]);
+  const rpHtml=rp.length
+    ? rp.map(r=>`<div class="erow"><div><div class="mn">${esc(r.who)}</div><div class="ms">${esc(r.source||"practice")}</div></div><div class="right">${r.minutes||0} min<div class="note">${esc(dt(r.practiced_on))}</div></div></div>`).join("")
+    : emptyState("🧘","No practice logged yet.");
+
+  const ra=(ENG.recent_achievements||[]);
+  const raHtml=ra.length
+    ? ra.map(a=>`<div class="erow"><div class="av">🏅</div><div><div class="mn">${esc(a.who)}</div><div class="ms">${esc(a.message||a.achievement_key||"")}</div></div><div class="right note">${esc(dt(a.created_at))}</div></div>`).join("")
+    : emptyState("🏅","No badges earned yet.");
+
+  const ch=(ENG.challenges||[]);
+  const chHtml=ch.length
+    ? ch.map(c=>`<div class="erow"><div class="av">📅</div><div><div class="mn">${esc(c.name)}</div><div class="ms">${c.days||"?"} days · ${esc(c.level||"all levels")}</div></div><div class="right">${c.enrollments} enrolled<div class="note">${c.completions} completed</div></div></div>`).join("")
+    : emptyState("📅","No community challenges yet.");
+
+  const st=(ENG.staged||[]);
+  const stHtml=st.length
+    ? st.map(s=>`<div class="erow"><div class="av">⏳</div><div><div class="mn">${esc(s.display_name||s.email)}</div><div class="ms">${esc(s.email)}</div></div><div class="right">${tierPill(s.target_tier)}<div class="note">awaiting first login</div></div></div>`).join("")
+    : emptyState("✓","Everyone imported has claimed their account.");
+
+  $("engage").innerHTML=`
+    <div class="erow-top">
+      <div class="note">A live snapshot of members and activity. Most of this fills in as people start practicing.</div>
+      <button id="engRefresh" class="btn ghost" style="padding:7px 14px">↻ Refresh</button>
+    </div>
+    <div class="stats">${statCards}</div>
+
+    <div class="tierbars">
+      <div class="note" style="margin-bottom:6px">Members by tier</div>
+      ${bars}
+    </div>
+
+    <div class="ecols">
+      <div>
+        <div class="panel">
+          <div class="ph">Members <span class="cnt">${(ENG.members||[]).length} shown</span></div>
+          <div class="esearch"><input id="engSearch" placeholder="Search members by name or email…" /></div>
+          <div id="engMembers">${memberRows(ENG.members||[])}</div>
+        </div>
+        <div class="panel">
+          <div class="ph">Community challenges</div>
+          ${chHtml}
+        </div>
+        <div class="panel">
+          <div class="ph">Awaiting account claim <span class="cnt">migration staging</span></div>
+          ${stHtml}
+        </div>
+      </div>
+      <div>
+        <div class="panel"><div class="ph">Streak leaders</div>${leadersHtml}</div>
+        <div class="panel"><div class="ph">Recent practice</div>${rpHtml}</div>
+        <div class="panel"><div class="ph">Recent badges</div>${raHtml}</div>
+      </div>
+    </div>`;
+
+  $("engRefresh").onclick=()=>loadEngagement(true);
+  $("engSearch").addEventListener("input",e=>{
+    const q=e.target.value.trim().toLowerCase();
+    const list=(ENG.members||[]).filter(m=>!q||(m.display_name||"").toLowerCase().includes(q)||(m.email||"").toLowerCase().includes(q));
+    $("engMembers").innerHTML=memberRows(list);
+  });
+}
 
 /* ---------- DATA ---------- */
 async function loadPoses(){
