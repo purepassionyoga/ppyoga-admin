@@ -1125,41 +1125,73 @@ async function saveBuilderSettings(){
 }
 
 /* ---------- EMAIL SETTINGS ---------- */
-let EMAIL={};
-async function loadEmail(){const{data}=await sb.from("app_settings").select("value").eq("key","email").single();EMAIL=(data&&data.value)||{};renderEmail();}
-function emailPrevHTML(){
-  const subj=($("e_subject")?$("e_subject").value:EMAIL.subject)||"Your Sequence of the Week from Pure Passion Yoga";
-  const intro=($("e_intro")?$("e_intro").value:EMAIL.intro)||"Here is this week\u2019s featured yoga sequence to inspire your practice.";
-  const sign=($("e_signoff")?$("e_signoff").value:EMAIL.signoff)||"Practice with love from PurePassionYoga.com";
-  return `<div style="border:1px solid var(--line);border-radius:12px;padding:20px;background:#fff;max-width:440px">
-    <div style="font-size:11px;letter-spacing:.16em;color:var(--muted)">PURE PASSION YOGA</div>
-    <div style="font-family:'Playfair Display',serif;color:var(--clayDk);font-size:22px;margin:6px 0 10px;line-height:1.2">${esc(subj)}</div>
-    <div style="color:var(--ink);font-size:14px">${esc(intro)}</div>
-    <ul style="color:var(--ink);font-size:14px;margin:12px 0;padding-left:18px"><li>Mountain \u2014 5 breaths</li><li>Warrior I \u2014 5 breaths</li><li>Downward Dog \u2014 8 breaths</li></ul>
-    <div style="display:inline-block;background:var(--clayDk);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px">View Sequence \u2192</div>
-    <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:10px;color:var(--muted);font-size:12px">${esc(sign)}</div>
-  </div>`;
+let EMAIL={}, EMAIL_STATS=null, EMAIL_SENDS=[];
+async function loadEmail(){
+  const{data}=await sb.from("app_settings").select("value").eq("key","email").single();
+  EMAIL=(data&&data.value)||{};
+  renderEmail();
+  try{
+    const ns=await sb.from("newsletter_subscribers").select("unsubscribed");
+    const subs=ns.data||[]; const total=subs.length, unsub=subs.filter(x=>x.unsubscribed).length;
+    const mem=await sb.from("profiles").select("tier,email");
+    EMAIL_STATS={active:total-unsub,unsub:unsub,members:(mem.data||[]).filter(m=>m.email).length};
+  }catch(e){EMAIL_STATS=null;}
+  try{const es=await sb.from("email_sends").select("*").order("created_at",{ascending:false}).limit(10);EMAIL_SENDS=es.data||[];}catch(e){EMAIL_SENDS=[];}
+  const sEl=$("emStats"); if(sEl) sEl.innerHTML=emailStatsHTML();
+  const hEl=$("emSends"); if(hEl) hEl.innerHTML=emailSendsHTML();
+}
+function emailStatsHTML(){
+  if(!EMAIL_STATS)return '<span style="color:var(--muted)">loading\u2026</span>';
+  const s=EMAIL_STATS;
+  return `<b>${s.active}</b> active newsletter subscriber${s.active===1?"":"s"} <span style="color:var(--muted)">(${s.unsub} unsubscribed)</span> \u00b7 <b>${s.members}</b> member${s.members===1?"":"s"} with email`;
+}
+function emailSendsHTML(){
+  if(!EMAIL_SENDS.length)return '<div style="color:var(--muted);font-size:13px">No emails sent yet.</div>';
+  return EMAIL_SENDS.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <div><div class="mn">${esc(r.subject||"(no subject)")}</div><div class="ms" style="color:var(--muted);font-size:12px">${new Date(r.created_at).toLocaleString()} \u00b7 ${esc(r.audience||"")}</div></div>
+    <div style="text-align:right;font-size:12px;white-space:nowrap"><span style="color:#3a7a4a">${r.sent_count||0} sent</span>${r.failed_count?` \u00b7 <span style="color:#b3261e">${r.failed_count} failed</span>`:""}</div></div>`).join("");
 }
 function renderEmail(){
   const d=EMAIL;
+  const tiers=["free","member","premium","practitioner","teacher","ultimate"];
+  const aud=d.audience||"newsletter";
   $("email").innerHTML=`<div id="emErr" class="err hidden"></div>
-   <div class="grp"><div class="gt">Sequence of the Week email</div>
-     <label class="toggle"><input type="checkbox" id="e_enabled" ${d.enabled?"checked":""}/> Enable the weekly email</label>
-     <div class="field" style="margin-top:10px"><label>Subject line</label><input id="e_subject" value="${esc(d.subject||"Your Sequence of the Week from Pure Passion Yoga")}"/></div>
-     <div class="field"><label>Intro paragraph</label><textarea id="e_intro">${esc(d.intro||"Here is this week\u2019s featured yoga sequence to inspire your practice.")}</textarea></div>
-     <div class="field"><label>Sign-off</label><textarea id="e_signoff">${esc(d.signoff||"Practice with love from PurePassionYoga.com")}</textarea></div>
-     <div class="row2"><div class="field"><label>From name</label><input id="e_from_name" value="${esc(d.from_name||"")}" placeholder="Pure Passion Yoga"/></div>
-       <div class="field"><label>From email</label><input id="e_from_email" value="${esc(d.from_email||"")}" placeholder="hello@purepassionyoga.com"/></div></div>
+   <div class="grp"><div class="gt">Weekly email</div>
+     <div class="note" style="margin-bottom:10px;display:block">Sends the sequence you pick in <b>Sequence Builder \u2192 \u2709 Weekly email</b>. The email body is generated automatically from that sequence (poses, notes, breaths, playlist). These settings control who receives it and how it's branded.</div>
+     <div style="font-size:13px">Audience right now: <span id="emStats">${emailStatsHTML()}</span></div>
    </div>
-   <div class="grp"><div class="gt">Preview</div><div id="emailPrev">${emailPrevHTML()}</div></div>
+   <div class="grp"><div class="gt">Delivery (via Resend)</div>
+     <div class="row2"><div class="field"><label>From name</label><input id="e_from_name" value="${esc(d.from_name||"Pure Passion Yoga")}"/></div>
+       <div class="field"><label>From email</label><input id="e_from_email" value="${esc(d.from_email||"")}" placeholder="hello@mail.purepassionyoga.com"/><div class="hint">Must be on your Resend-verified domain.</div></div></div>
+     <div class="field"><label>Reply-to (optional)</label><input id="e_reply_to" value="${esc(d.reply_to||"")}" placeholder="you@purepassionyoga.com"/><div class="hint">Where replies land \u2014 e.g. your Outlook address.</div></div>
+   </div>
+   <div class="grp"><div class="gt">Audience</div>
+     <div class="row2"><div class="field"><label>Send to</label><select id="e_audience">
+        <option value="newsletter"${aud==="newsletter"?" selected":""}>Newsletter subscribers</option>
+        <option value="members"${aud==="members"?" selected":""}>Members (by tier)</option>
+        <option value="both"${aud==="both"?" selected":""}>Both</option></select></div>
+       <div class="field"><label>Minimum member tier</label><select id="e_min_tier">${tiers.map(t=>`<option value="${t}"${(d.member_min_tier||"member")===t?" selected":""}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`).join("")}</select><div class="hint">Used when sending to members.</div></div></div>
+   </div>
+   <div class="grp"><div class="gt">Branding</div>
+     <div class="field"><label>Subject prefix</label><input id="e_subject_prefix" value="${esc(d.weekly_subject_prefix||"This week's practice: ")}"/><div class="hint">Prepended to the sequence name to form the default subject.</div></div>
+     <div class="field"><label>Footer text</label><textarea id="e_footer">${esc(d.footer_text||"You're receiving this because you subscribed to Pure Passion Yoga.")}</textarea></div>
+   </div>
+   <div class="grp"><div class="gt">Recent sends</div><div id="emSends">${emailSendsHTML()}</div></div>
    <button class="btn" id="e_save">Save email settings</button>
    <span id="e_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
   $("e_save").onclick=saveEmail;
-  ["e_subject","e_intro","e_signoff"].forEach(k=>$(k).addEventListener("input",()=>{$("emailPrev").innerHTML=emailPrevHTML();}));
 }
 async function saveEmail(){
-  const d={enabled:$("e_enabled").checked,subject:$("e_subject").value.trim(),intro:$("e_intro").value.trim(),
-    signoff:$("e_signoff").value.trim(),from_name:$("e_from_name").value.trim(),from_email:$("e_from_email").value.trim()};
+  const d=Object.assign({},EMAIL,{
+    provider:"resend",
+    from_name:$("e_from_name").value.trim(),
+    from_email:$("e_from_email").value.trim(),
+    reply_to:$("e_reply_to").value.trim(),
+    audience:$("e_audience").value,
+    member_min_tier:$("e_min_tier").value,
+    weekly_subject_prefix:$("e_subject_prefix").value,
+    footer_text:$("e_footer").value.trim()
+  });
   $("e_save").disabled=true;$("e_save").textContent="Saving\u2026";
   const{error}=await sb.from("app_settings").upsert({key:"email",value:d});
   $("e_save").disabled=false;$("e_save").textContent="Save email settings";
