@@ -124,6 +124,21 @@
   .abody{padding:16px}
   .exbtns{margin-left:auto;display:flex;gap:8px}
   .exbtns .btn{padding:6px 12px}
+
+  /* legal */
+  .lcat{font-family:'Playfair Display',serif;color:var(--head);font-size:16px;margin:22px 0 6px}
+  .lrow{display:flex;align-items:center;gap:14px;padding:11px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+  .lrow .mn{font-weight:500;color:var(--head)}
+  .lrow .ms{color:var(--muted);font-size:12px}
+  .lrow .lright{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .pill-on{font-size:11px;color:var(--jade);background:#E5F0EC;padding:2px 9px;border-radius:999px}
+  .pill-off{font-size:11px;color:var(--muted);background:#F2ECF2;padding:2px 9px;border-radius:999px}
+  .sw{position:relative;width:42px;height:24px;flex:0 0 auto;display:inline-block}
+  .sw input{opacity:0;width:0;height:0}
+  .sw .sl{position:absolute;inset:0;background:var(--lineDk);border-radius:999px;transition:.2s;cursor:pointer}
+  .sw .sl::before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .sw input:checked + .sl{background:var(--jade)}
+  .sw input:checked + .sl::before{transform:translateX(18px)}
 </style>
 </head>
 <body>
@@ -157,6 +172,7 @@
       <button class="tab" data-tab="builder">Builder</button>
       <button class="tab" data-tab="email">Email</button>
       <button class="tab" data-tab="advanced">Advanced</button>
+      <button class="tab" data-tab="legal">Legal</button>
     </div>
   </div>
 
@@ -177,6 +193,7 @@
     <div id="builder" class="hidden"></div>
     <div id="email" class="hidden"></div>
     <div id="advanced" class="hidden"></div>
+    <div id="legal" class="hidden"></div>
   </div>
 </div>
 
@@ -237,8 +254,10 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("builder").classList.toggle("hidden", t.dataset.tab!=="builder");
   $("email").classList.toggle("hidden", t.dataset.tab!=="email");
   $("advanced").classList.toggle("hidden", t.dataset.tab!=="advanced");
+  $("legal").classList.toggle("hidden", t.dataset.tab!=="legal");
   if(t.dataset.tab==="engage") loadEngagement();
   if(t.dataset.tab==="advanced") loadAdvanced();
+  if(t.dataset.tab==="legal") loadLegal();
 });
 
 /* ---------- ENGAGEMENT ---------- */
@@ -355,6 +374,118 @@ function renderEngagement(){
     const list=(ENG.members||[]).filter(m=>!q||(m.display_name||"").toLowerCase().includes(q)||(m.email||"").toLowerCase().includes(q));
     $("engMembers").innerHTML=memberRows(list);
   });
+}
+
+/* ---------- LEGAL ---------- */
+const LEGAL_URL="https://ppyoga-app.vercel.app/legal.html";
+let LEGAL=[], legalLoaded=false, legalQuery="";
+function slugifyL(t){ return (t||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
+
+async function loadLegal(force){
+  if(legalLoaded && !force) return;
+  $("legal").innerHTML='<div style="padding:18px;color:var(--muted)">Loading…</div>';
+  const { data, error } = await sb.from("legal_pages").select("*").order("category").order("sort_order");
+  if(error){ $("legal").innerHTML='<div style="padding:18px;color:#A03A22">'+esc(error.message)+'</div>'; return; }
+  LEGAL=data||[]; legalLoaded=true; renderLegal();
+}
+
+function renderLegal(){
+  const vis=LEGAL.filter(p=>p.visible).length;
+  const q=legalQuery.trim().toLowerCase();
+  const list=LEGAL.filter(p=>!q || p.title.toLowerCase().includes(q) || (p.category||"").toLowerCase().includes(q));
+  const cats={}; list.forEach(p=>{(cats[p.category]=cats[p.category]||[]).push(p);});
+  let html=`<div class="erow-top">
+    <div class="note">${vis} of ${LEGAL.length} pages are visible in your public Legal Center. Flip any switch to show or hide it instantly.</div>
+    <div style="display:flex;gap:8px">
+      <a class="btn ghost" style="padding:7px 14px" href="${LEGAL_URL}" target="_blank" rel="noopener">View center ↗</a>
+      <button id="legalNew" class="btn" style="padding:7px 14px">+ New page</button>
+    </div>
+  </div>
+  <div class="toolbar"><input id="legalSearch" placeholder="Search legal pages…" value="${esc(legalQuery)}"/></div>`;
+  Object.keys(cats).forEach(cat=>{
+    html+=`<div class="lcat">${esc(cat)}</div>`;
+    cats[cat].forEach(p=>{
+      html+=`<div class="lrow">
+        <label class="sw"><input type="checkbox" data-vis="${p.id}" ${p.visible?"checked":""}><span class="sl"></span></label>
+        <div><div class="mn">${esc(p.title)} ${p.body?"":'<span class="pill-off">no content</span>'}</div><div class="ms">${esc(p.slug)}</div></div>
+        <div class="lright">
+          <span class="${p.visible?"pill-on":"pill-off"}">${p.visible?"Visible":"Hidden"}</span>
+          ${p.body?`<a href="${LEGAL_URL}?doc=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener" class="btn ghost" style="padding:5px 11px">View</a>`:""}
+          <button class="btn ghost" style="padding:5px 11px" data-edit="${p.id}">Edit</button>
+        </div>
+      </div>`;
+    });
+  });
+  $("legal").innerHTML=html;
+  $("legalNew").onclick=()=>openLegalEditor(null);
+  $("legalSearch").oninput=e=>{ legalQuery=e.target.value; const c=e.target.selectionStart; renderLegal(); const s=$("legalSearch"); if(s){ s.focus(); s.setSelectionRange(c,c); } };
+  $("legal").querySelectorAll("[data-vis]").forEach(c=>c.onchange=()=>toggleVisible(c.dataset.vis,c.checked));
+  $("legal").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openLegalEditor(b.dataset.edit));
+}
+
+async function toggleVisible(id, checked){
+  const p=LEGAL.find(x=>x.id===id); if(p) p.visible=checked;
+  const { error } = await sb.from("legal_pages").update({ visible:checked }).eq("id",id);
+  if(error){ alert("Couldn’t update: "+error.message); if(p) p.visible=!checked; loadLegal(true); return; }
+  renderLegal();
+}
+
+function openLegalEditor(id){
+  const p = id ? LEGAL.find(x=>x.id===id) : { title:"", category:"Legal", slug:"", body:"", visible:false, sort_order:(LEGAL.reduce((m,x)=>Math.max(m,x.sort_order||0),0)+1) };
+  const cats=[...new Set(LEGAL.map(x=>x.category).filter(Boolean))];
+  $("edRoot").innerHTML=`<div class="ovl"><div class="ed">
+    <div class="edtop"><h2>${id?"Edit legal page":"New legal page"}</h2>
+      <button id="legalClose" class="btn ghost" style="margin-left:auto;padding:7px 13px">Close</button></div>
+    <div class="edbody">
+      <div class="grp">
+        <div class="row2">
+          <div class="field"><label>Title</label><input id="lTitle" value="${esc(p.title)}"/></div>
+          <div class="field"><label>Category</label><input id="lCat" list="lCats" value="${esc(p.category||"")}"/>
+            <datalist id="lCats">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label>Slug (URL)</label><input id="lSlug" value="${esc(p.slug)}"/><div class="hint">Link: …/legal.html?doc=<b>slug</b></div></div>
+          <div class="field"><label>Sort order</label><input id="lSort" type="number" value="${p.sort_order||0}"/></div>
+        </div>
+        <label class="toggle"><input id="lVis" type="checkbox" ${p.visible?"checked":""}/> Visible in public Legal Center</label>
+      </div>
+      <div class="grp">
+        <div class="gt">Content (HTML)</div>
+        <div class="field"><textarea id="lBody" style="min-height:300px;font-family:ui-monospace,monospace;font-size:13px">${esc(p.body||"")}</textarea>
+          <div class="hint">Use &lt;h2&gt; for headings, &lt;p&gt; for paragraphs, &lt;ul&gt;&lt;li&gt; for lists. Leave blank to keep it a “coming soon” stub.</div></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="lSave" class="btn">Save</button>
+        ${id?`<button id="lDelete" class="btn ghost" style="color:#A03A22;border-color:#E9C9BE">Delete</button>`:""}
+        <span id="lMsg" style="font-size:12px"></span>
+      </div>
+    </div>
+  </div></div>`;
+  $("legalClose").onclick=closeLegalEditor;
+  $("lSave").onclick=()=>saveLegal(id);
+  if(id) $("lDelete").onclick=()=>deleteLegal(id);
+}
+function closeLegalEditor(){ $("edRoot").innerHTML=""; }
+
+async function saveLegal(id){
+  const title=$("lTitle").value.trim();
+  if(!title){ $("lMsg").innerHTML='<span style="color:#A03A22">Title is required.</span>'; return; }
+  const payload={ title, category:$("lCat").value.trim()||"Legal", slug:($("lSlug").value.trim()||slugifyL(title)),
+    sort_order:parseInt($("lSort").value,10)||0, visible:$("lVis").checked, body:$("lBody").value.trim()||null };
+  $("lSave").disabled=true; $("lMsg").innerHTML='<span style="color:var(--muted)">Saving…</span>';
+  let res;
+  if(id) res=await sb.from("legal_pages").update(payload).eq("id",id);
+  else res=await sb.from("legal_pages").insert(payload);
+  $("lSave").disabled=false;
+  if(res.error){ $("lMsg").innerHTML='<span style="color:#A03A22">'+esc(res.error.message)+'</span>'; return; }
+  closeLegalEditor(); loadLegal(true);
+}
+async function deleteLegal(id){
+  const p=LEGAL.find(x=>x.id===id);
+  if(!confirm(`Delete “${p?p.title:"this page"}”? This can’t be undone.`)) return;
+  const { error } = await sb.from("legal_pages").delete().eq("id",id);
+  if(error){ $("lMsg").innerHTML='<span style="color:#A03A22">'+esc(error.message)+'</span>'; return; }
+  closeLegalEditor(); loadLegal(true);
 }
 
 /* ---------- ADVANCED ---------- */
