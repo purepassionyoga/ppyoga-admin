@@ -362,6 +362,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.tab==="site") loadSite();
   if(t.dataset.tab==="billing") loadBilling();
   if(t.dataset.tab==="shop") loadShop();
+  if(t.dataset.tab==="email") loadEmail();
 });
 
 /* ---------- SHOP ---------- */
@@ -1127,9 +1128,9 @@ async function saveBuilderSettings(){
 /* ---------- EMAIL SETTINGS ---------- */
 let EMAIL={}, EMAIL_STATS=null, EMAIL_SENDS=[];
 async function loadEmail(){
-  const{data}=await sb.from("app_settings").select("value").eq("key","email").single();
-  EMAIL=(data&&data.value)||{};
-  renderEmail();
+  try{const{data}=await sb.from("app_settings").select("value").eq("key","email").single();EMAIL=(data&&data.value)||EMAIL||{};}
+  catch(e){EMAIL=EMAIL||{};}
+  try{renderEmail();}catch(e){$("email").innerHTML='<div class="err">Email panel failed to render: '+esc(String(e&&e.message||e))+'</div>';return;}
   try{
     const ns=await sb.from("newsletter_subscribers").select("unsubscribed");
     const subs=ns.data||[]; const total=subs.length, unsub=subs.filter(x=>x.unsubscribed).length;
