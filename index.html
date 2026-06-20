@@ -176,7 +176,7 @@
 <body>
 <header class="ppy-header" id="ppyHeader">
   <div class="ppy-bar">
-    <a class="ppy-brand" id="ppyBrand" href="https://ppyoga-app.vercel.app">
+    <a class="ppy-brand" id="ppyBrand" href="/">
       <svg class="mark" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
         <path d="M24 7c2.6 3.2 4 6.7 4 10.2 0 3.8-1.6 7.2-4 9.8-2.4-2.6-4-6-4-9.8C20 13.7 21.4 10.2 24 7Z" fill="#C8A0A6"/>
         <path d="M13 14c3.7 1 6.6 2.9 8.6 5.3 2.2 2.6 3.2 5.8 3.1 9-3.4-.6-6.6-2.2-8.8-4.8-2-2.4-3-5.6-2.9-9.5Z" fill="#a8ad91"/>
@@ -188,17 +188,17 @@
       <span class="wm brand">Pure Passion Yoga</span>
     </a>
     <nav class="ppy-nav" id="ppyNav">
-      <a href="https://ppyoga-app.vercel.app">Pose Library</a>
-      <a href="https://ppyoga-builder.vercel.app">Sequence Builder</a>
-      <a data-nav="classes" hidden href="https://ppyoga-app.vercel.app/classes">Classes</a>
-      <a data-nav="challenges" hidden href="https://ppyoga-app.vercel.app/challenges">Challenges</a>
+      <a href="/library">Pose Library</a>
+      <a href="/builder">Sequence Builder</a>
+      <a data-nav="classes" hidden href="/classes">Classes</a>
+      <a data-nav="challenges" hidden href="/challenges">Challenges</a>
       <a href="https://purepassionyoga.com/shop">Shop</a>
       <a href="https://purepassionyoga.com/about">About</a>
     </nav>
     <div class="ppy-right" id="ppyRight">
       <span class="ppy-tier" id="ppyTier" hidden></span>
-      <a class="ppy-btn admin" id="ppyAdmin" hidden href="https://ppyoga-admin.vercel.app">Admin</a>
-      <a class="ppy-btn primary" id="ppyAuth" href="https://ppyoga-profile.vercel.app">Sign in</a>
+      <a class="ppy-btn admin" id="ppyAdmin" hidden href="/admin">Admin</a>
+      <a class="ppy-btn primary" id="ppyAuth" href="/profile">Sign in</a>
       <a class="ppy-btn ghost" id="ppySignout" hidden href="#">Sign out</a>
     </div>
     <button class="ppy-burger" id="ppyBurger" aria-label="Menu">
@@ -206,14 +206,14 @@
     </button>
   </div>
   <div class="ppy-mobile" id="ppyMobile">
-    <a href="https://ppyoga-app.vercel.app">Pose Library</a>
-    <a href="https://ppyoga-builder.vercel.app">Sequence Builder</a>
-    <a data-nav="classes" hidden href="https://ppyoga-app.vercel.app/classes">Classes</a>
-    <a data-nav="challenges" hidden href="https://ppyoga-app.vercel.app/challenges">Challenges</a>
+    <a href="/library">Pose Library</a>
+    <a href="/builder">Sequence Builder</a>
+    <a data-nav="classes" hidden href="/classes">Classes</a>
+    <a data-nav="challenges" hidden href="/challenges">Challenges</a>
     <a href="https://purepassionyoga.com/shop">Shop</a>
     <a href="https://purepassionyoga.com/about">About</a>
-    <a class="admin" id="ppyAdminM" hidden href="https://ppyoga-admin.vercel.app">Admin</a>
-    <a class="up" id="ppyAuthM" href="https://ppyoga-profile.vercel.app">Sign in</a>
+    <a class="admin" id="ppyAdminM" hidden href="/admin">Admin</a>
+    <a class="up" id="ppyAuthM" href="/profile">Sign in</a>
     <a class="admin" id="ppySignoutM" hidden href="#">Sign out</a>
   </div>
 </header>
@@ -456,7 +456,7 @@ function renderEngagement(){
 }
 
 /* ---------- LEGAL ---------- */
-const LEGAL_URL="https://ppyoga-app.vercel.app/legal.html";
+const LEGAL_URL="/legal";
 let LEGAL=[], legalLoaded=false, legalQuery="";
 function slugifyL(t){ return (t||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
 
@@ -822,38 +822,64 @@ let SITE={};
 async function loadSite(){const{data}=await sb.from("app_settings").select("value").eq("key","site").single();SITE=(data&&data.value)||{};renderSite();}
 function renderSite(){
   const d=SITE, tiers=["free","member","practitioner","teacher","premium","ultimate"];
-  const opts=sel=>tiers.map(t=>`<option value="${t}"${(sel||"free")===t?" selected":""}>${t}</option>`).join("");
+  const opt=sel=>tiers.map(t=>`<option value="${t}"${(sel||"free")===t?" selected":""}>${t}</option>`).join("");
+  const full=Array.isArray(d.library_full_tiers)?d.library_full_tiers:["teacher","ultimate"];
+  const nl=d.newsletter||{}, so=d.social||{};
+  const tierChecks=tiers.map(t=>`<label class="toggle" style="display:inline-flex;margin:0 14px 8px 0"><input type="checkbox" class="s_fulltier" value="${t}" ${full.includes(t)?"checked":""}/> ${t}</label>`).join("");
   $("site").innerHTML=`<div id="siteErr" class="err hidden"></div>
    <div class="grp"><div class="gt">Features</div>
      <label class="toggle"><input type="checkbox" id="s_classes" ${d.classes_enabled?"checked":""}/> Classes — show in the site header nav</label>
      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="s_challenges" ${d.challenges_enabled?"checked":""}/> Challenges — show in the site header nav</label>
-     <div class="hint">Toggles the Classes / Challenges links in the shared header across every page.</div>
+     <div class="hint">Toggles the Classes / Challenges links in the shared header.</div>
    </div>
-   <div class="grp"><div class="gt">Access by tier</div>
+   <div class="grp"><div class="gt">Pose library access</div>
+     <div class="hint" style="margin-bottom:8px">Tiers that can open <b>all</b> poses. Everyone else — including signed-out visitors — can browse the library but only open free poses.</div>
+     <div>${tierChecks}</div>
+   </div>
+   <div class="grp"><div class="gt">Access by tier · Classes / Challenges</div>
      <div class="row2">
-       <div class="field"><label>Classes unlock at tier</label><select id="s_classes_tier">${opts(d.classes_min_tier)}</select></div>
-       <div class="field"><label>Challenges unlock at tier</label><select id="s_challenges_tier">${opts(d.challenges_min_tier)}</select></div>
+       <div class="field"><label>Classes unlock at tier</label><select id="s_classes_tier">${opt(d.classes_min_tier)}</select></div>
+       <div class="field"><label>Challenges unlock at tier</label><select id="s_challenges_tier">${opt(d.challenges_min_tier)}</select></div>
      </div>
-     <div class="hint">Members at or above the chosen tier get access once those pages go live.</div>
    </div>
    <div class="grp"><div class="gt">Sign-in providers</div>
      <label class="toggle"><input type="checkbox" id="s_google" ${d.auth_google!==false?"checked":""}/> Google sign-in</label>
      <label class="toggle" style="margin-top:8px"><input type="checkbox" id="s_facebook" ${d.auth_facebook?"checked":""}/> Facebook sign-in</label>
-     <div class="hint">Unchecked providers are hidden on the sign-in page. Enable the matching provider in Supabase Auth as well.</div>
+     <div class="hint">Also enable the matching provider in Supabase Auth.</div>
+   </div>
+   <div class="grp"><div class="gt">Footer · Newsletter</div>
+     <label class="toggle"><input type="checkbox" id="s_nl_enabled" ${nl.enabled!==false?"checked":""}/> Show the newsletter sign-up in the footer</label>
+     <div class="field" style="margin-top:10px"><label>Heading</label><input id="s_nl_head" value="${esc(nl.heading||"Stay in the flow")}"/></div>
+     <div class="field"><label>Subtext</label><input id="s_nl_sub" value="${esc(nl.sub||"Sequences, classes & studio news — straight to your inbox.")}"/></div>
+     <div class="field"><label>Button text</label><input id="s_nl_btn" value="${esc(nl.button||"Subscribe")}"/></div>
+     <div class="hint">Sign-ups are saved to your newsletter_subscribers list with source &ldquo;site_footer&rdquo;.</div>
+   </div>
+   <div class="grp"><div class="gt">Footer · Social links</div>
+     <div class="field"><label>Instagram URL</label><input id="s_so_instagram" value="${esc(so.instagram||"")}"/></div>
+     <div class="field"><label>Facebook URL</label><input id="s_so_facebook" value="${esc(so.facebook||"")}"/></div>
+     <div class="field"><label>YouTube URL</label><input id="s_so_youtube" value="${esc(so.youtube||"")}"/></div>
+     <div class="field"><label>Pinterest URL</label><input id="s_so_pinterest" value="${esc(so.pinterest||"")}"/></div>
+     <div class="field"><label>TikTok URL</label><input id="s_so_tiktok" value="${esc(so.tiktok||"")}"/></div>
+     <div class="hint">Only platforms with a URL appear in the footer.</div>
    </div>
    <button class="btn" id="s_save">Save site settings</button>
    <span id="s_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
   $("s_save").onclick=saveSite;
 }
 async function saveSite(){
+  const fulltiers=[...document.querySelectorAll(".s_fulltier:checked")].map(c=>c.value);
+  const social={instagram:$("s_so_instagram").value.trim(),facebook:$("s_so_facebook").value.trim(),youtube:$("s_so_youtube").value.trim(),pinterest:$("s_so_pinterest").value.trim(),tiktok:$("s_so_tiktok").value.trim()};
   const d={classes_enabled:$("s_classes").checked,challenges_enabled:$("s_challenges").checked,
     classes_min_tier:$("s_classes_tier").value,challenges_min_tier:$("s_challenges_tier").value,
-    auth_google:$("s_google").checked,auth_facebook:$("s_facebook").checked};
+    auth_google:$("s_google").checked,auth_facebook:$("s_facebook").checked,
+    library_full_tiers:fulltiers,
+    newsletter:{enabled:$("s_nl_enabled").checked,heading:$("s_nl_head").value.trim(),sub:$("s_nl_sub").value.trim(),button:$("s_nl_btn").value.trim()},
+    social:social};
   $("s_save").disabled=true;$("s_save").textContent="Saving\u2026";
   const{error}=await sb.from("app_settings").upsert({key:"site",value:d});
   $("s_save").disabled=false;$("s_save").textContent="Save site settings";
   if(error){const e=$("siteErr");e.textContent=error.message;e.classList.remove("hidden");return;}
-  SITE=d;$("s_status").textContent="Saved \u2713 \u2014 refresh the apps to see header changes.";
+  SITE=d;$("s_status").textContent="Saved \u2713 \u2014 refresh the apps to see changes.";
 }
 
 /* ---------- BUILDER SETTINGS ---------- */
