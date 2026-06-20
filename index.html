@@ -309,10 +309,12 @@ const arr=v=>Array.isArray(v)?v:[];
 const TAG_FIELDS=["alternate_names","chakras","body_focus","muscle_groups","movement_actions","yoga_styles","pose_phases","benefit_tags","contraindication_tags","required_props","keywords"];
 const LIST_FIELDS=["instructions","teaching_cues","breath_cues","modifications","advanced_variations"];
 const SUG_FIELDS=["category","difficulty_level","primary_movement"].concat(TAG_FIELDS);
+const YOGA_STYLES=["Yoni", "Yinyasa", "Yin-Yang", "Yin", "Yang", "Wheel", "Vinyasa", "Viniyoga", "Therapy", "Teens Yoga", "Tantra", "Somatic", "Sivananda", "Shadow", "Seniors", "Sculpt", "Scaravelli", "Satyananda", "Sattva", "Rocket", "Restorative", "Qigong", "Purna", "Prenatal", "Power", "Postnatal", "Pilates", "Patanjala", "Partner", "Paddle", "Other", "Ortho-Bionomy", "Mommy & Me", "Meridian", "Mantra", "Mandala", "Laya", "Kurunta", "Kundalini", "Kripalu", "Kids", "Kemetic", "Karma", "Kaiut", "Jnana", "Jivamukti", "Jain", "Integrative", "Iyengar", "Hypopressive", "Hot", "Hatha", "Gentle", "Forrest", "Energy Medicine (EM)", "Dru", "Do In", "Dhyana", "Continuum", "Chair", "Bouddha", "Body Positive", "Bo", "Bikram", "BMC", "Bhakti", "Baptiste", "Ball", "Backmitra", "Ashtanga", "Aqua", "Anusara", "Ananda", "Alexander", "Aerial", "Acro"];
 
 function buildSuggestions(){
   SUG={};
   SUG_FIELDS.forEach(f=>{const set=new Set();POSES.forEach(p=>{const v=p[f];(Array.isArray(v)?v:[v]).forEach(x=>{if(x)set.add(x);});});SUG[f]=[...set].sort((a,b)=>a.localeCompare(b));});
+  SUG.yoga_styles=[...new Set([...(SUG.yoga_styles||[]),...YOGA_STYLES])].sort((a,b)=>a.localeCompare(b));
 }
 
 /* ---------- AUTH ---------- */
