@@ -419,8 +419,8 @@ function renderShop(){
         <div class="field"><label>Heading</label><input id="s_heading" value="${esc(s.heading||"Shop")}"/></div>
         <div class="field"><label>Subheading</label><input id="s_subheading" value="${esc(s.subheading||"")}"/></div>
       </div>
-      <button class="btn" id="s_save">Save shop settings</button>
-      <span id="s_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>
+      <button class="btn" id="shop_save">Save shop settings</button>
+      <span id="shop_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>
       <div class="hint">Affiliate products open an external link. \u201cSold here (Stripe)\u201d is ready in the schema for when you sell natively \u2014 paste a Stripe one-time price ID and we\u2019ll wire its checkout.</div>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px">
@@ -428,7 +428,7 @@ function renderShop(){
       <button class="btn" id="s_add">+ Add product</button>
     </div>
     <div id="prodList">${SHOP_PRODUCTS.map(prodCard).join("")||'<div style="color:var(--muted)">No products yet \u2014 click \u201c+ Add product\u201d.</div>'}</div>`;
-  $("s_save").onclick=saveShopSettings;
+  $("shop_save").onclick=saveShopSettings;
   $("s_add").onclick=addProduct;
   bindProdCards();
 }
@@ -440,11 +440,11 @@ function bindProdCards(){
 }
 async function saveShopSettings(){
   const out={enabled:$("s_enabled").checked, heading:$("s_heading").value.trim()||"Shop", subheading:$("s_subheading").value.trim()};
-  $("s_save").disabled=true;
+  $("shop_save").disabled=true;
   const{error}=await sb.from("app_settings").upsert({key:"shop",value:out});
-  $("s_save").disabled=false;
+  $("shop_save").disabled=false;
   if(error){$("shopErr").textContent=error.message;$("shopErr").classList.remove("hidden");return;}
-  SHOP=out;$("s_status").textContent="Saved \u2713";
+  SHOP=out;$("shop_status").textContent="Saved \u2713";
 }
 function addProduct(){
   const list=$("prodList"); const wrap=document.createElement("div");
@@ -523,7 +523,7 @@ function renderBilling(){
     </div>
     ${plans.map(planCard).join("")}
     <button class="btn" id="b_save">Save billing settings</button>
-    <span id="b_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+    <span id="bill_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
   $("b_save").onclick=saveBilling;
 }
 async function saveBilling(){
@@ -542,7 +542,7 @@ async function saveBilling(){
   const{error}=await sb.from("app_settings").upsert({key:"billing",value:out});
   $("b_save").disabled=false;$("b_save").textContent="Save billing settings";
   if(error){const e=$("billErr");e.textContent=error.message;e.classList.remove("hidden");return;}
-  BILLING=out;$("b_status").textContent="Saved \u2713";
+  BILLING=out;$("bill_status").textContent="Saved \u2713";
 }
 
 /* ---------- ENGAGEMENT ---------- */
