@@ -250,6 +250,7 @@
       <button class="tab" data-tab="legal">Legal</button>
       <button class="tab" data-tab="site">Site</button>
       <button class="tab" data-tab="billing">Billing</button>
+      <button class="tab" data-tab="shop">Shop</button>
     </div>
   </div>
 
@@ -273,6 +274,7 @@
     <div id="legal" class="hidden"></div>
     <div id="site" class="hidden"></div>
     <div id="billing" class="hidden"></div>
+    <div id="shop" class="hidden"></div>
   </div>
 </div>
 
@@ -336,12 +338,136 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("legal").classList.toggle("hidden", t.dataset.tab!=="legal");
   $("site").classList.toggle("hidden", t.dataset.tab!=="site");
   $("billing").classList.toggle("hidden", t.dataset.tab!=="billing");
+  $("shop").classList.toggle("hidden", t.dataset.tab!=="shop");
   if(t.dataset.tab==="engage") loadEngagement();
   if(t.dataset.tab==="advanced") loadAdvanced();
   if(t.dataset.tab==="legal") loadLegal();
   if(t.dataset.tab==="site") loadSite();
   if(t.dataset.tab==="billing") loadBilling();
+  if(t.dataset.tab==="shop") loadShop();
 });
+
+/* ---------- SHOP ---------- */
+let SHOP=null, SHOP_PRODUCTS=[];
+async function loadShop(){
+  const s=await sb.from("app_settings").select("value").eq("key","shop").single();
+  SHOP=(s.data&&s.data.value)||{enabled:false,heading:"Shop",subheading:""};
+  const p=await sb.from("products").select("*").order("sort_order",{ascending:true}).order("created_at",{ascending:true});
+  SHOP_PRODUCTS=p.data||[];
+  renderShop();
+}
+function shMoney(c){ return (c==null||c==="")?"":((Number(c)||0)/100).toFixed(2); }
+function prodCard(p){
+  p=p||{}; const id=p.id||"";
+  return `<div class="grp" data-pid="${id}">
+    <div class="row2">
+      <div class="field"><label>Title</label><input class="p_title" value="${esc(p.title||"")}"/></div>
+      <div class="field"><label>Status</label><select class="p_status"><option value="draft" ${p.status!=="published"?"selected":""}>Draft</option><option value="published" ${p.status==="published"?"selected":""}>Published</option></select></div>
+    </div>
+    <div class="field"><label>Description</label><textarea class="p_desc" rows="2">${esc(p.description||"")}</textarea></div>
+    <div class="row2">
+      <div class="field"><label>Image URL</label><input class="p_img" placeholder="https://…" value="${esc(p.image_url||"")}"/></div>
+      <div class="field"><label>Link URL (affiliate / external)</label><input class="p_url" placeholder="https://…" value="${esc(p.url||"")}"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Price ($)</label><input class="p_price" value="${shMoney(p.price_cents)}"/></div>
+      <div class="field"><label>Was / regular price ($, optional)</label><input class="p_reg" value="${shMoney(p.regular_cents)}"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Categories (comma-separated)</label><input class="p_cats" placeholder="Props, Books" value="${esc((p.categories||[]).join(", "))}"/></div>
+      <div class="field"><label>Rating (0\u20135, optional)</label><input class="p_rating" value="${p.rating!=null?p.rating:""}"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Type</label><select class="p_type"><option value="affiliate" ${p.product_type!=="native"?"selected":""}>Affiliate / external link</option><option value="native" ${p.product_type==="native"?"selected":""}>Sold here (Stripe)</option></select></div>
+      <div class="field"><label>Stripe price ID (native only)</label><input class="p_pid" placeholder="price_\u2026" value="${esc(p.stripe_price_id||"")}"/></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Sort order</label><input class="p_sort" value="${p.sort_order!=null?p.sort_order:0}"/></div>
+      <div class="field"><label class="toggle" style="margin-top:26px"><input type="checkbox" class="p_feat" ${p.featured?"checked":""}/> Featured</label></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+      <button class="btn p_save">Save</button>
+      <button class="btn ghost p_del">Delete</button>
+      <span class="p_msg" style="color:var(--muted);font-size:13px"></span>
+    </div>
+  </div>`;
+}
+function renderShop(){
+  const s=SHOP;
+  $("shop").innerHTML=`<div id="shopErr" class="err hidden"></div>
+    <div class="grp"><div class="gt">Shop \u2014 settings</div>
+      <label class="toggle"><input type="checkbox" id="s_enabled" ${s.enabled?"checked":""}/> Shop enabled (show the Shop link in the site header)</label>
+      <div class="row2" style="margin-top:10px">
+        <div class="field"><label>Heading</label><input id="s_heading" value="${esc(s.heading||"Shop")}"/></div>
+        <div class="field"><label>Subheading</label><input id="s_subheading" value="${esc(s.subheading||"")}"/></div>
+      </div>
+      <button class="btn" id="s_save">Save shop settings</button>
+      <span id="s_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>
+      <div class="hint">Affiliate products open an external link. \u201cSold here (Stripe)\u201d is ready in the schema for when you sell natively \u2014 paste a Stripe one-time price ID and we\u2019ll wire its checkout.</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 10px">
+      <div class="gt" style="margin:0">Products (${SHOP_PRODUCTS.length})</div>
+      <button class="btn" id="s_add">+ Add product</button>
+    </div>
+    <div id="prodList">${SHOP_PRODUCTS.map(prodCard).join("")||'<div style="color:var(--muted)">No products yet \u2014 click \u201c+ Add product\u201d.</div>'}</div>`;
+  $("s_save").onclick=saveShopSettings;
+  $("s_add").onclick=addProduct;
+  bindProdCards();
+}
+function bindProdCards(){
+  document.querySelectorAll('#shop [data-pid]').forEach(card=>{
+    card.querySelector(".p_save").onclick=()=>saveProduct(card);
+    const d=card.querySelector(".p_del"); if(d) d.onclick=()=>deleteProduct(card);
+  });
+}
+async function saveShopSettings(){
+  const out={enabled:$("s_enabled").checked, heading:$("s_heading").value.trim()||"Shop", subheading:$("s_subheading").value.trim()};
+  $("s_save").disabled=true;
+  const{error}=await sb.from("app_settings").upsert({key:"shop",value:out});
+  $("s_save").disabled=false;
+  if(error){$("shopErr").textContent=error.message;$("shopErr").classList.remove("hidden");return;}
+  SHOP=out;$("s_status").textContent="Saved \u2713";
+}
+function addProduct(){
+  const list=$("prodList"); const wrap=document.createElement("div");
+  wrap.innerHTML=prodCard({status:"draft",product_type:"affiliate",sort_order:SHOP_PRODUCTS.length+1,categories:[]});
+  const card=wrap.firstElementChild; list.insertBefore(card,list.firstChild);
+  card.querySelector(".p_save").onclick=()=>saveProduct(card);
+  card.querySelector(".p_del").onclick=()=>card.remove();
+}
+function shSlug(t){ return (t||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,50); }
+async function saveProduct(card){
+  const g=s=>card.querySelector(s);
+  const cents=v=>{v=(v||"").toString().trim(); return v===""?null:Math.round(parseFloat(v)*100);};
+  const rv=g(".p_rating").value.trim();
+  const rec={
+    title:g(".p_title").value.trim(), description:g(".p_desc").value.trim(),
+    image_url:g(".p_img").value.trim(), url:g(".p_url").value.trim(),
+    price_cents:cents(g(".p_price").value), regular_cents:cents(g(".p_reg").value),
+    categories:g(".p_cats").value.split(",").map(x=>x.trim()).filter(Boolean),
+    rating:rv===""?null:parseFloat(rv),
+    product_type:g(".p_type").value, stripe_price_id:g(".p_pid").value.trim(),
+    status:g(".p_status").value, sort_order:parseInt(g(".p_sort").value)||0,
+    featured:g(".p_feat").checked, updated_at:new Date().toISOString()
+  };
+  const msg=g(".p_msg");
+  if(!rec.title){ msg.textContent="Title required"; return; }
+  msg.textContent="Saving\u2026";
+  const id=card.getAttribute("data-pid"); let res;
+  if(id){ res=await sb.from("products").update(rec).eq("id",id); }
+  else { rec.slug=shSlug(rec.title)+"-"+Math.random().toString(36).slice(2,6); res=await sb.from("products").insert(rec).select("id").single(); }
+  if(res.error){ msg.textContent=res.error.message; return; }
+  if(!id && res.data && res.data.id){ card.setAttribute("data-pid",res.data.id); SHOP_PRODUCTS.push({id:res.data.id}); }
+  msg.textContent="Saved \u2713";
+}
+async function deleteProduct(card){
+  const id=card.getAttribute("data-pid");
+  if(!id){ card.remove(); return; }
+  if(!confirm("Delete this product? This cannot be undone.")) return;
+  const{error}=await sb.from("products").delete().eq("id",id);
+  if(error){ card.querySelector(".p_msg").textContent=error.message; return; }
+  card.remove();
+}
 
 /* ---------- BILLING ---------- */
 let BILLING=null;
