@@ -963,19 +963,48 @@ function renderDesign(){
   const fonts=`<datalist id="fontlist">${D_FONTS.map(f=>`<option value="${f}">`).join("")}</datalist>
    <div class="row2"><div class="field"><label>Heading font</label><input id="d_font_heading" list="fontlist" value="${esc(d.font_heading||"Playfair Display")}"/></div>
    <div class="field"><label>Body font</label><input id="d_font_body" list="fontlist" value="${esc(d.font_body||"Poppins")}"/></div></div>`;
+  const logoImg=d.logo_url?`<img src="${esc(d.logo_url)}" style="max-width:100%;max-height:100%;object-fit:contain"/>`:'<span style="color:var(--muted);font-size:12px">No logo</span>';
   $("design").innerHTML=`<div id="designErr" class="err hidden"></div>
     <div class="grp"><div class="gt">Branding</div>${txt}</div>
+    <div class="grp"><div class="gt">Logo</div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+        <div id="logoPrev" style="width:140px;height:64px;border:1px solid var(--lineDk);border-radius:10px;background:var(--field);display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto">${logoImg}</div>
+        <div style="flex:1;min-width:220px">
+          <input type="file" id="logoFile" accept="image/png,image/svg+xml,image/jpeg,image/webp"/>
+          <div class="hint" id="logoStatus">PNG or SVG with a transparent background works best. Replaces the lotus mark in the site header across all pages.</div>
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px"><label>Logo URL</label><input id="d_logo_url" value="${esc(d.logo_url||"")}" placeholder="https://\u2026"/><div class="hint">Uploading fills this in automatically. Clear it and Save to remove the logo.</div></div>
+      <button class="btn ghost" id="logoClear" style="padding:6px 12px">Remove logo</button>
+    </div>
     <div class="grp"><div class="gt">Colors</div>${cols}</div>
     <div class="grp"><div class="gt">Typography</div>${fonts}</div>
     <button class="btn" id="d_save">Save design</button>
     <span id="d_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
   $("d_save").onclick=saveDesign;
+  (function(){
+    const fileEl=$("logoFile"), urlEl=$("d_logo_url"), prev=$("logoPrev"), st=$("logoStatus"), clr=$("logoClear");
+    function updateLogoPrev(){ const u=(urlEl.value||"").trim(); prev.innerHTML=u?`<img src="${esc(u)}" style="max-width:100%;max-height:100%;object-fit:contain"/>`:'<span style="color:var(--muted);font-size:12px">No logo</span>'; }
+    if(urlEl) urlEl.oninput=updateLogoPrev;
+    if(clr) clr.onclick=()=>{ urlEl.value=""; updateLogoPrev(); st.textContent="Logo cleared \u2014 click Save design to apply."; };
+    if(fileEl) fileEl.onchange=async e=>{
+      const file=e.target.files&&e.target.files[0]; if(!file) return;
+      st.textContent="Uploading\u2026";
+      const ext=(file.name.split(".").pop()||"png").toLowerCase();
+      const path="branding/logo-"+Date.now().toString(36)+"."+ext;
+      const{error}=await sb.storage.from("pose-images").upload(path,file,{upsert:true,contentType:file.type||undefined});
+      if(error){ st.textContent="Upload failed: "+error.message; return; }
+      const{data}=sb.storage.from("pose-images").getPublicUrl(path);
+      urlEl.value=data.publicUrl; updateLogoPrev(); st.textContent="Uploaded \u2713 \u2014 click Save design to apply.";
+    };
+  })();
   D_COLORS.forEach(([k])=>{const c=$("d_"+k),t=$("dt_"+k);c.oninput=()=>{t.value=c.value;};t.oninput=()=>{if(/^#?[0-9a-fA-F]{6}$/.test(t.value))c.value=t.value.startsWith("#")?t.value:"#"+t.value;};});
 }
 async function saveDesign(){
-  const d={};D_TEXT.forEach(([k])=>d[k]=$("d_"+k).value.trim());
+  const d=Object.assign({},DESIGN);D_TEXT.forEach(([k])=>d[k]=$("d_"+k).value.trim());
   D_COLORS.forEach(([k])=>{const t=$("dt_"+k).value.trim();d[k]=t?(t.startsWith("#")?t:"#"+t):$("d_"+k).value;});
   d.font_heading=$("d_font_heading").value.trim()||"Playfair Display";d.font_body=$("d_font_body").value.trim()||"Poppins";
+  d.logo_url=$("d_logo_url").value.trim();
   $("d_save").disabled=true;$("d_save").textContent="Saving\u2026";
   const{error}=await sb.from("app_settings").upsert({key:"design",value:d});
   $("d_save").disabled=false;$("d_save").textContent="Save design";
