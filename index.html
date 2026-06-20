@@ -249,6 +249,7 @@
       <button class="tab" data-tab="advanced">Advanced</button>
       <button class="tab" data-tab="legal">Legal</button>
       <button class="tab" data-tab="site">Site</button>
+      <button class="tab" data-tab="billing">Billing</button>
     </div>
   </div>
 
@@ -271,6 +272,7 @@
     <div id="advanced" class="hidden"></div>
     <div id="legal" class="hidden"></div>
     <div id="site" class="hidden"></div>
+    <div id="billing" class="hidden"></div>
   </div>
 </div>
 
@@ -333,11 +335,71 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("advanced").classList.toggle("hidden", t.dataset.tab!=="advanced");
   $("legal").classList.toggle("hidden", t.dataset.tab!=="legal");
   $("site").classList.toggle("hidden", t.dataset.tab!=="site");
+  $("billing").classList.toggle("hidden", t.dataset.tab!=="billing");
   if(t.dataset.tab==="engage") loadEngagement();
   if(t.dataset.tab==="advanced") loadAdvanced();
   if(t.dataset.tab==="legal") loadLegal();
   if(t.dataset.tab==="site") loadSite();
+  if(t.dataset.tab==="billing") loadBilling();
 });
+
+/* ---------- BILLING ---------- */
+let BILLING=null;
+async function loadBilling(){ const{data}=await sb.from("app_settings").select("value").eq("key","billing").single(); BILLING=(data&&data.value)||{plans:[]}; renderBilling(); }
+function renderBilling(){
+  const b=BILLING, plans=Array.isArray(b.plans)?b.plans:[];
+  const feats=["library","builder","classes","challenges"];
+  const fnLabel={library:"Pose library",builder:"Sequence builder",classes:"Classes",challenges:"Challenges"};
+  const money=c=>((Number(c)||0)/100).toFixed(2);
+  const planCard=(p,i)=>`<div class="grp" data-plan="${i}">
+     <div class="gt">${esc(p.name||p.id)} <span style="color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400">(${esc(p.id)})</span></div>
+     <label class="toggle"><input type="checkbox" class="b_active" ${p.active?"checked":""}/> Active — show on the pricing page &amp; allow checkout</label>
+     <div class="row2" style="margin-top:10px">
+       <div class="field"><label>Display name</label><input class="b_name" value="${esc(p.name||"")}"/></div>
+       <div class="field"><label>Tagline</label><input class="b_blurb" value="${esc(p.blurb||"")}"/></div>
+     </div>
+     <div class="field"><label>Unlocks (shown as copy on the pricing page)</label><div>${feats.map(f=>`<label class="toggle" style="display:inline-flex;margin:0 14px 6px 0"><input type="checkbox" class="b_unlock" value="${f}" ${(p.unlocks||[]).includes(f)?"checked":""}/> ${fnLabel[f]}</label>`).join("")}</div></div>
+     <div class="row2">
+       <div class="field"><label>Monthly price ($)</label><input class="b_m_amt" value="${money(p.monthly&&p.monthly.amount)}"/></div>
+       <div class="field"><label>Monthly Stripe price ID</label><input class="b_m_pid" placeholder="price_\u2026" value="${esc((p.monthly&&p.monthly.price_id)||"")}"/></div>
+     </div>
+     <div class="row2">
+       <div class="field"><label>Annual price ($)</label><input class="b_a_amt" value="${money(p.annual&&p.annual.amount)}"/></div>
+       <div class="field"><label>Annual Stripe price ID</label><input class="b_a_pid" placeholder="price_\u2026" value="${esc((p.annual&&p.annual.price_id)||"")}"/></div>
+     </div>
+   </div>`;
+  $("billing").innerHTML=`<div id="billErr" class="err hidden"></div>
+    <div class="grp"><div class="gt">Billing \u2014 global</div>
+      <label class="toggle"><input type="checkbox" id="b_enabled" ${b.enabled!==false?"checked":""}/> Billing enabled (master switch for the pricing page)</label>
+      <div class="row2" style="margin-top:10px">
+        <div class="field"><label>Currency</label><input id="b_currency" value="${esc(b.currency||"usd")}"/></div>
+        <div class="field"><label>Free trial (days, 0 = none)</label><input id="b_trial" value="${Number(b.trial_days)||0}"/></div>
+      </div>
+      <div class="hint">Paste the Stripe <b>Price ID</b> (price_\u2026) for each plan after you create it in Stripe. The dollar amount here is what the pricing page <i>shows</i>; the real charge is whatever that Stripe Price is set to \u2014 keep them in sync. A plan only takes checkout once it has a price ID and is Active.</div>
+    </div>
+    ${plans.map(planCard).join("")}
+    <button class="btn" id="b_save">Save billing settings</button>
+    <span id="b_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("b_save").onclick=saveBilling;
+}
+async function saveBilling(){
+  const cards=[...document.querySelectorAll('#billing [data-plan]')];
+  const cents=v=>Math.round((parseFloat(v)||0)*100);
+  const plans=cards.map(card=>{
+    const g=s=>card.querySelector(s); const base=BILLING.plans[+card.dataset.plan];
+    return { id:base.id, order:base.order,
+      name:g(".b_name").value.trim(), blurb:g(".b_blurb").value.trim(), active:g(".b_active").checked,
+      unlocks:[...card.querySelectorAll(".b_unlock:checked")].map(c=>c.value),
+      monthly:{ amount:cents(g(".b_m_amt").value), price_id:g(".b_m_pid").value.trim() },
+      annual:{ amount:cents(g(".b_a_amt").value), price_id:g(".b_a_pid").value.trim() } };
+  });
+  const out={ enabled:$("b_enabled").checked, currency:($("b_currency").value.trim()||"usd"), trial_days:parseInt($("b_trial").value)||0, plans };
+  $("b_save").disabled=true;$("b_save").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"billing",value:out});
+  $("b_save").disabled=false;$("b_save").textContent="Save billing settings";
+  if(error){const e=$("billErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  BILLING=out;$("b_status").textContent="Saved \u2713";
+}
 
 /* ---------- ENGAGEMENT ---------- */
 let ENG=null, engLoaded=false;
