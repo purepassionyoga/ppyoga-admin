@@ -142,6 +142,7 @@
 
   /* ===== PPY site header ===== */
 .ppy-header{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--ppy-line,#EFE6E8)}
+.ppy-header [hidden]{display:none !important}
 .ppy-bar{max-width:1200px;margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:16px}
 .ppy-brand{display:flex;align-items:center;gap:9px;text-decoration:none;flex:0 0 auto}
 .ppy-brand .mark{width:34px;height:34px;flex:0 0 auto}
@@ -198,6 +199,7 @@
       <span class="ppy-tier" id="ppyTier" hidden></span>
       <a class="ppy-btn admin" id="ppyAdmin" hidden href="https://ppyoga-admin.vercel.app">Admin</a>
       <a class="ppy-btn primary" id="ppyAuth" href="https://ppyoga-profile.vercel.app">Sign in</a>
+      <a class="ppy-btn ghost" id="ppySignout" hidden href="#">Sign out</a>
     </div>
     <button class="ppy-burger" id="ppyBurger" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -212,6 +214,7 @@
     <a href="https://purepassionyoga.com/about">About</a>
     <a class="admin" id="ppyAdminM" hidden href="https://ppyoga-admin.vercel.app">Admin</a>
     <a class="up" id="ppyAuthM" href="https://ppyoga-profile.vercel.app">Sign in</a>
+    <a class="admin" id="ppySignoutM" hidden href="#">Sign out</a>
   </div>
 </header>
 
@@ -230,7 +233,7 @@
 <!-- APP -->
 <div id="app" class="hidden">
   <div class="top">
-    <div class="topin">
+    <div class="topin" style="display:none">
       <span class="brand">Pure Passion Yoga</span>
       <span class="tag-admin">Admin</span>
       <span class="who"><span id="whoami"></span><button id="signout" class="btn ghost" style="padding:6px 12px">Sign out</button></span>
@@ -245,6 +248,7 @@
       <button class="tab" data-tab="email">Email</button>
       <button class="tab" data-tab="advanced">Advanced</button>
       <button class="tab" data-tab="legal">Legal</button>
+      <button class="tab" data-tab="site">Site</button>
     </div>
   </div>
 
@@ -266,6 +270,7 @@
     <div id="email" class="hidden"></div>
     <div id="advanced" class="hidden"></div>
     <div id="legal" class="hidden"></div>
+    <div id="site" class="hidden"></div>
   </div>
 </div>
 
@@ -327,9 +332,11 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("email").classList.toggle("hidden", t.dataset.tab!=="email");
   $("advanced").classList.toggle("hidden", t.dataset.tab!=="advanced");
   $("legal").classList.toggle("hidden", t.dataset.tab!=="legal");
+  $("site").classList.toggle("hidden", t.dataset.tab!=="site");
   if(t.dataset.tab==="engage") loadEngagement();
   if(t.dataset.tab==="advanced") loadAdvanced();
   if(t.dataset.tab==="legal") loadLegal();
+  if(t.dataset.tab==="site") loadSite();
 });
 
 /* ---------- ENGAGEMENT ---------- */
@@ -809,6 +816,46 @@ async function saveLibrary(){
   LIB=d;$("l_status").textContent="Saved \u2713 \u2014 refresh the public library to see it.";
 }
 
+
+/* ---------- SITE SETTINGS ---------- */
+let SITE={};
+async function loadSite(){const{data}=await sb.from("app_settings").select("value").eq("key","site").single();SITE=(data&&data.value)||{};renderSite();}
+function renderSite(){
+  const d=SITE, tiers=["free","member","practitioner","teacher","premium","ultimate"];
+  const opts=sel=>tiers.map(t=>`<option value="${t}"${(sel||"free")===t?" selected":""}>${t}</option>`).join("");
+  $("site").innerHTML=`<div id="siteErr" class="err hidden"></div>
+   <div class="grp"><div class="gt">Features</div>
+     <label class="toggle"><input type="checkbox" id="s_classes" ${d.classes_enabled?"checked":""}/> Classes — show in the site header nav</label>
+     <label class="toggle" style="margin-top:8px"><input type="checkbox" id="s_challenges" ${d.challenges_enabled?"checked":""}/> Challenges — show in the site header nav</label>
+     <div class="hint">Toggles the Classes / Challenges links in the shared header across every page.</div>
+   </div>
+   <div class="grp"><div class="gt">Access by tier</div>
+     <div class="row2">
+       <div class="field"><label>Classes unlock at tier</label><select id="s_classes_tier">${opts(d.classes_min_tier)}</select></div>
+       <div class="field"><label>Challenges unlock at tier</label><select id="s_challenges_tier">${opts(d.challenges_min_tier)}</select></div>
+     </div>
+     <div class="hint">Members at or above the chosen tier get access once those pages go live.</div>
+   </div>
+   <div class="grp"><div class="gt">Sign-in providers</div>
+     <label class="toggle"><input type="checkbox" id="s_google" ${d.auth_google!==false?"checked":""}/> Google sign-in</label>
+     <label class="toggle" style="margin-top:8px"><input type="checkbox" id="s_facebook" ${d.auth_facebook?"checked":""}/> Facebook sign-in</label>
+     <div class="hint">Unchecked providers are hidden on the sign-in page. Enable the matching provider in Supabase Auth as well.</div>
+   </div>
+   <button class="btn" id="s_save">Save site settings</button>
+   <span id="s_status" style="margin-left:12px;color:var(--muted);font-size:13px"></span>`;
+  $("s_save").onclick=saveSite;
+}
+async function saveSite(){
+  const d={classes_enabled:$("s_classes").checked,challenges_enabled:$("s_challenges").checked,
+    classes_min_tier:$("s_classes_tier").value,challenges_min_tier:$("s_challenges_tier").value,
+    auth_google:$("s_google").checked,auth_facebook:$("s_facebook").checked};
+  $("s_save").disabled=true;$("s_save").textContent="Saving\u2026";
+  const{error}=await sb.from("app_settings").upsert({key:"site",value:d});
+  $("s_save").disabled=false;$("s_save").textContent="Save site settings";
+  if(error){const e=$("siteErr");e.textContent=error.message;e.classList.remove("hidden");return;}
+  SITE=d;$("s_status").textContent="Saved \u2713 \u2014 refresh the apps to see header changes.";
+}
+
 /* ---------- BUILDER SETTINGS ---------- */
 let BSET={};
 async function loadBuilderSettings(){const{data}=await sb.from("app_settings").select("value").eq("key","builder").single();BSET=(data&&data.value)||{};renderBuilderSettings();}
@@ -1045,21 +1092,19 @@ function showEdErr(m){ const e=$("edErr"); e.textContent=m; e.classList.remove("
 sb.auth.onAuthStateChange((_e,session)=>{ if(!session) showLogin(); });
 init();
 </script>
+
 <script>
 /* ===== PPY adaptive header controller =====
-   Self-contained. No external deps. Safe on any PPY page.
-   Today (cross-origin): no same-origin session -> renders the logged-out shell.
-   Once pages share one domain: auto-upgrades to tier/admin-aware with zero re-bake.
-*/
+   Self-contained, no external deps. Cross-origin safe.
+   Logged-out / cross-origin -> shows the public shell.
+   Same-origin session -> tier pill, Account, Admin (if is_admin), Sign out. */
 (function(){
-  var SB="https://nxjbpgnpblqepathojzr.supabase.co", KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54amJwZ25wYmxxZXBhdGhvanpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0OTE3MTYsImV4cCI6MjA5MDA2NzcxNn0.0thRMnySyacG_fcFiHlteEk4scwfWrP6HmjSlBdg3Ik";
+  var SB="https://nxjbpgnpblqepathojzr.supabase.co", KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54amJwZ25wYmxxZXBhdGhvanpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0OTE3MTYsImV4cCI6MjA5MDA2NzcxNn0.0thRMnySyacG_fcFiHlteEk4scwfWrP6HmjSlBdg3Ik", REF="nxjbpgnpblqepathojzr";
   var $=function(id){return document.getElementById(id);};
 
-  // 1) Burger -> mobile menu
   var burger=$("ppyBurger"), mob=$("ppyMobile");
   if(burger&&mob) burger.addEventListener("click",function(){mob.classList.toggle("open");});
 
-  // 2) Active link by current location
   try{
     var norm=function(h,p){return h+(p||"/").replace(/\/index\.html$/,"/").replace(/\/+$/,"/");};
     var here=norm(location.host, location.pathname);
@@ -1068,7 +1113,6 @@ init();
     });
   }catch(e){}
 
-  // 3) design + site config (one request): brand text, logo, Classes/Challenges reveal
   fetch(SB+"/rest/v1/app_settings?select=key,value&key=in.(design,site)",
         {headers:{apikey:KEY,Authorization:"Bearer "+KEY}})
     .then(function(r){return r.ok?r.json():[];})
@@ -1088,11 +1132,9 @@ init();
       if(site.challenges_enabled) document.querySelectorAll("[data-nav='challenges']").forEach(function(e){e.hidden=false;});
     }).catch(function(){});
 
-  // 4) Auth state from same-origin Supabase session (no SDK needed).
-  //    Cross-origin there is no token here, so this is a graceful no-op until same domain.
   function readSession(){
     try{
-      var raw=localStorage.getItem("sb-nxjbpgnpblqepathojzr-auth-token");
+      var raw=localStorage.getItem("sb-"+REF+"-auth-token");
       if(!raw) return null;
       if(raw.indexOf("base64-")===0){ raw=decodeURIComponent(escape(atob(raw.slice(7)))); }
       var s=JSON.parse(raw);
@@ -1101,22 +1143,26 @@ init();
     return null;
   }
   var sess=readSession();
-  if(!sess) return; // logged-out shell stands
+  if(!sess) return;
 
-  // Logged in: flip to Account, fetch tier + admin
-  var auth=$("ppyAuth"), authM=$("ppyAuthM");
+  function signOut(e){
+    if(e) e.preventDefault();
+    try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf("sb-"+REF+"-auth-token")===0) localStorage.removeItem(k); }); }catch(_){}
+    location.reload();
+  }
+  var auth=$("ppyAuth"), authM=$("ppyAuthM"), so=$("ppySignout"), som=$("ppySignoutM");
   if(auth) auth.textContent="Account";
   if(authM) authM.textContent="Account";
+  if(so){ so.hidden=false; so.addEventListener("click",signOut); }
+  if(som){ som.hidden=false; som.addEventListener("click",signOut); }
+
   fetch(SB+"/rest/v1/profiles?select=tier,is_admin&id=eq."+encodeURIComponent(sess.user.id),
         {headers:{apikey:KEY,Authorization:"Bearer "+sess.access_token}})
     .then(function(r){return r.ok?r.json():[];})
     .then(function(rows){
       var p=(rows&&rows[0])||{};
       if(p.tier){ var t=$("ppyTier"); if(t){ t.textContent=p.tier; t.hidden=false; } }
-      if(p.is_admin){
-        var a=$("ppyAdmin"); if(a) a.hidden=false;
-        var am=$("ppyAdminM"); if(am) am.hidden=false;
-      }
+      if(p.is_admin){ var a=$("ppyAdmin"); if(a) a.hidden=false; var am=$("ppyAdminM"); if(am) am.hidden=false; }
     }).catch(function(){});
 })();
 </script>
