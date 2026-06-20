@@ -284,7 +284,7 @@
     <div id="design" class="hidden"></div>
     <div id="library" class="hidden"></div>
     <div id="builder" class="hidden"></div>
-    <div id="email" class="hidden"></div>
+    <div id="emailtab" class="hidden"></div>
     <div id="advanced" class="hidden"></div>
     <div id="legal" class="hidden"></div>
     <div id="site" class="hidden"></div>
@@ -350,7 +350,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   $("design").classList.toggle("hidden", t.dataset.tab!=="design");
   $("library").classList.toggle("hidden", t.dataset.tab!=="library");
   $("builder").classList.toggle("hidden", t.dataset.tab!=="builder");
-  $("email").classList.toggle("hidden", t.dataset.tab!=="email");
+  $("emailtab").classList.toggle("hidden", t.dataset.tab!=="email");
   $("advanced").classList.toggle("hidden", t.dataset.tab!=="advanced");
   $("legal").classList.toggle("hidden", t.dataset.tab!=="legal");
   $("site").classList.toggle("hidden", t.dataset.tab!=="site");
@@ -1130,7 +1130,7 @@ let EMAIL={}, EMAIL_STATS=null, EMAIL_SENDS=[];
 async function loadEmail(){
   try{const{data}=await sb.from("app_settings").select("value").eq("key","email").single();EMAIL=(data&&data.value)||EMAIL||{};}
   catch(e){EMAIL=EMAIL||{};}
-  try{renderEmail();}catch(e){$("email").innerHTML='<div class="err">Email panel failed to render: '+esc(String(e&&e.message||e))+'</div>';return;}
+  try{renderEmail();}catch(e){$("emailtab").innerHTML='<div class="err">Email panel failed to render: '+esc(String(e&&e.message||e))+'</div>';return;}
   try{
     const ns=await sb.from("newsletter_subscribers").select("unsubscribed");
     const subs=ns.data||[]; const total=subs.length, unsub=subs.filter(x=>x.unsubscribed).length;
@@ -1156,7 +1156,7 @@ function renderEmail(){
   const d=EMAIL;
   const tiers=["free","member","premium","practitioner","teacher","ultimate"];
   const aud=d.audience||"newsletter";
-  $("email").innerHTML=`<div id="emErr" class="err hidden"></div>
+  $("emailtab").innerHTML=`<div id="emErr" class="err hidden"></div>
    <div class="grp"><div class="gt">Weekly email</div>
      <div class="note" style="margin-bottom:10px;display:block">Sends the sequence you pick in <b>Sequence Builder \u2192 \u2709 Weekly email</b>. The email body is generated automatically from that sequence (poses, notes, breaths, playlist). These settings control who receives it and how it's branded.</div>
      <div style="font-size:13px">Audience right now: <span id="emStats">${emailStatsHTML()}</span></div>
